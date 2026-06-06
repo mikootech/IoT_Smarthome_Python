@@ -1,0 +1,6 @@
+# Mengabaikan brankas rahasia
+.env
+
+# Mengabaikan file sampah/cache bawaan Python agar repo tetap bersih
+__pycache__/
+*.pyc
