@@ -3,17 +3,18 @@ from machine import Pin, ADC, I2C
 import network
 import dht
 from umqtt.simple import MQTTClient
-import ssd1306  
+import ssd1306
+from config import broker, client, topik, ssid, password
 
 # --- KONFIGURASI ---
-BROKER = "broker.hivemq.com"
-CLIENT = "esp32_mikojat_smart_179"
-TOPIK = "miko/home/smart"
-SSID = "POCO M5"
-PASS = "miko1234"
+BROKER = broker
+CLIENT = client
+TOPIK = topik
+SSID = ssid
+PASS = password
 
 
-time.sleep(1)
+# time.sleep(1)
 # --- INISIALISASI PERANGKAT KERAS ---
 i2c = I2C(0, scl=Pin(22), sda=Pin(21))
 oled = ssd1306.SSD1306_I2C(128, 32, i2c) # Layar resolusi 128x32
@@ -38,21 +39,26 @@ def Tampilkan_OLED(baris1, baris2="", baris3=""):
     oled.show()               
 
 # --- FUNGSI KONEKSI ---
+# --- FUNGSI KONEKSI (DISEDERHANAKAN) ---
+# --- FUNGSI KONEKSI (DISEDERHANAKAN) ---
 def Connect_WiFi(ssid_target, pass_target): 
     global wlan
     wlan = network.WLAN(network.STA_IF)
+    wlan.active(True) # Pastikan antena menyala
     
-    # 1. Netralkan radio WiFi jika sebelumnya crash/putus
-    wlan.disconnect()
-    wlan.active(False)
-    time.sleep(0.5) # Beri jeda 0.5 detik agar mesin radio beristirahat
+    # Putuskan koneksi yang menggantung (gunakan try-except agar tidak error jika memang sudah putus)
+    try:
+        wlan.disconnect()
+    except:
+        pass
     
-    # 2. Nyalakan kembali dengan status yang benar-benar bersih
-    wlan.active(True)
+    time.sleep(1) # Beri nafas 1 detik untuk mesin WiFi
     
     if not wlan.isconnected():
         print(f"Menghubungkan ke {ssid_target}...")
         Tampilkan_OLED("Connecting...", ssid_target) 
+        
+        # Eksekusi koneksi
         wlan.connect(ssid_target, pass_target)
         
         waktu_tunggu = 10
