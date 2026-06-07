@@ -1,7 +1,6 @@
 import streamlit as st
 import pandas as pd
 import os
-from dotenv import load_dotenv
 from supabase import create_client, Client
 
 # --- KONFIGURASI HALAMAN ---
@@ -9,15 +8,24 @@ st.set_page_config(page_title="Dashboard IoT", layout="wide")
 st.title("📊 Dashboard Jemuran Pintar")
 
 # --- KONEKSI SUPABASE ---
-load_dotenv()
-url = os.getenv("URL")
-key = os.getenv("KEY")
+# Trik Cerdas: Coba muat dotenv (untuk laptop), abaikan jika tidak ada (untuk internet)
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+except ImportError:
+    pass # Lanjutkan saja, jangan error
+
+# Ambil kunci dari Brankas (baik lokal maupun cloud)
+url = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
+key = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
 
 if not url or not key:
-    st.error("Kredensial Supabase tidak ditemukan di file .env!")
+    st.error("Kredensial Supabase tidak ditemukan!")
     st.stop()
 
 supabase: Client = create_client(url, key)
+
+# ... (Lanjutkan fungsi ambil_data() dan kode ke bawah sama persis seperti sebelumnya) ...
 
 # --- FUNGSI TARIK DATA ---
 def ambil_data():
