@@ -1,112 +1,120 @@
-#import bawaan
 import time 
-from machine import Pin, ADC
+from machine import Pin, ADC, I2C
 import network
-
-
-#REMOTE READ
-import webrepl
-webrepl.start()
-
-
-#import untuk teknis purpose
 import dht
 from umqtt.simple import MQTTClient
+import ssd1306  
 
+# --- KONFIGURASI ---
 BROKER = "broker.hivemq.com"
 CLIENT = "esp32_mikojat_smart_179"
 TOPIK = "miko/home/smart"
-
 SSID = "POCO M5"
 PASS = "miko1234"
 
-# INISIALISASI MQTT
-client = MQTTClient(CLIENT, BROKER)
 
-# WAKTU
-waktu_sebelumnya = time.ticks_ms()
-interval_waktu = 10000
+time.sleep(1)
+# --- INISIALISASI PERANGKAT KERAS ---
+i2c = I2C(0, scl=Pin(22), sda=Pin(21))
+oled = ssd1306.SSD1306_I2C(128, 32, i2c) # Layar resolusi 128x32
 
-led = Pin(23,Pin.OUT)
-buzzer = Pin(4,Pin.OUT)
+led = Pin(23, Pin.OUT)
+buzzer = Pin(4, Pin.OUT)
 sensor_dht = dht.DHT11(Pin(14))
 ldr = ADC(Pin(34))
-ldr.atten(ADC.ATTN_11DB) # Redaman 11dB untuk membaca hingga 3.3V
+ldr.atten(ADC.ATTN_11DB) 
 
-def Connect_Mqtt():
-    try :
-        client.connect()
-        print("connect ke mqtt")
-    
-    except OSError:
-        
-        print("GAGAL: Broker MQTT tidak merespons.")
-        
-def Connect_WiFi(SSID, PASSWORD):
+client = MQTTClient(CLIENT, BROKER)
+waktu_sebelumnya = time.ticks_ms()
+interval_waktu = 3000
+
+# --- FUNGSI TAMPILAN OLED ---
+def Tampilkan_OLED(baris1, baris2="", baris3=""):
+    """Fungsi pembantu agar mudah menulis ke OLED"""
+    oled.fill(0) 
+    oled.text(baris1, 0, 0)   # Baris 1 di atas
+    oled.text(baris2, 0, 10)  # Baris 2 agak ke tengah (disesuaikan untuk 32px)
+    oled.text(baris3, 0, 20)  # Baris 3 di bawah (disesuaikan untuk 32px)
+    oled.show()               
+
+# --- FUNGSI KONEKSI ---
+def Connect_WiFi(ssid_target, pass_target): 
     global wlan
-    
     wlan = network.WLAN(network.STA_IF)
+    
+    # 1. Netralkan radio WiFi jika sebelumnya crash/putus
+    wlan.disconnect()
+    wlan.active(False)
+    time.sleep(0.5) # Beri jeda 0.5 detik agar mesin radio beristirahat
+    
+    # 2. Nyalakan kembali dengan status yang benar-benar bersih
     wlan.active(True)
     
-    print("memindai jaringan di sekitar ")
-    daftar_wifi = wlan.scan()
-    
-    for wifi in daftar_wifi:
-        print(f"- SSID: {wifi[0].decode('utf-8')} | Sinyal: {wifi[3]} dBm")
-        
     if not wlan.isconnected():
-        print(f"\nMenghubungkan ke {SSID}...")
-        wlan.connect(SSID, PASSWORD)
+        print(f"Menghubungkan ke {ssid_target}...")
+        Tampilkan_OLED("Connecting...", ssid_target) 
+        wlan.connect(ssid_target, pass_target)
         
-        # Batasi waktu tunggu maksimal 10 detik (agar tidak stuck jika gagal)
         waktu_tunggu = 10
         while not wlan.isconnected() and waktu_tunggu > 0:
             print(".", end="")
             time.sleep(1)
             waktu_tunggu -= 1
             
-    # 4. Cek Status Akhir
     if wlan.isconnected():
-        print("\nWiFi Berhasil Terhubung!")
-        # Menampilkan info IP Address, Subnet Mask, dan Gateway yang didapat ESP32
-        print("Konfigurasi Jaringan (IP/Netmask/GW/DNS):", wlan.ifconfig())
+        ip_address = wlan.ifconfig()[0]
+        print("\nWiFi Berhasil Terhubung! IP:", ip_address)
+        Tampilkan_OLED("WiFi Connected!", "IP Address:", ip_address)
     else:
-        print("\nGagal terhubung. Periksa kembali SSID dan Password Anda.")
+        print("\nGagal terhubung WiFi.")
+        Tampilkan_OLED("WiFi Failed!")
 
 
-def PUBLISH_MQTT(suhu, kelembapan, ldr):
+#CONFIG MQTT
+def Connect_Mqtt():
+    try:
+        client.connect()
+        print("Berhasil connect ke MQTT")
+    except OSError:
+        print("GAGAL: Broker MQTT tidak merespons.")
+
+
+#MENGIRIM BACAAN SENSOR KE MQTT HIVEMQ
+def PUBLISH_MQTT(suhu, kelembapan, nilai_ldr):
     global client
-    payload = f'{{"suhu" : {suhu}, "kelembapan" : {kelembapan}, "ldr" : {ldr}}}'
-    
+    payload = f'{{"suhu": {suhu}, "kelembapan": {kelembapan}, "ldr": {nilai_ldr}}}'
     client.publish(TOPIK, payload)
-    print("Data sukses terkirim ke MQTT:", payload)
-
-    led.value(1)
+    print("Data terkirim:", payload)
+    
     buzzer.value(1)
-    time.sleep(0.1)
-
+    led.value(1)
+    time.sleep(0.05)
     led.value(0)
     buzzer.value(0)
-    time.sleep(0.1)
 
+
+# --- JALANKAN ---
+oled.fill(0)
+oled.show()
+
+# Panggil dengan argumen yang benar
 Connect_WiFi(SSID, PASS)
 Connect_Mqtt()
 
-# -----------------------------------------------------------
-# LOOP MAIN==================================================
-# -----------------------------------------------------------
-# --- 1. SETUP AWAL ---
-# (Koneksi WiFi, Setup Sensor, dll ada di luar sini)
-
 print("Program berjalan...")
 
-# --- 2. BUNGKUS SELURUH SISTEM DENGAN TRY UTAMA ---
 try:
     while True:
         waktu_sekarang = time.ticks_ms()
+        
         if time.ticks_diff(waktu_sekarang, waktu_sebelumnya) >= interval_waktu:
             
-            # --- 3. BUNGKUS ERROR KONEKSI/SENSOR DI DALAM SINI ---
+            # --- CEK KONEKSI WIFI SEBELUM KIRIM ---
+            if not wlan.isconnected(): # Tambahan titik dua (:)
+                print("Koneksi terputus, mencoba reconnect...") # Perbaikan tanda kutip
+                Connect_WiFi(SSID, PASS) # Panggil dengan argumen
+                Connect_Mqtt() # Jangan lupa sambung ulang MQTT-nya juga!
+                
             try:
                 sensor_dht.measure()
                 suhu = sensor_dht.temperature()
@@ -114,22 +122,20 @@ try:
                 nilai_cahaya = ldr.read()
                 
                 PUBLISH_MQTT(suhu, kelembaban, nilai_cahaya)
-                                
+                
+                ip_sekarang = wlan.ifconfig()[0]
+                Tampilkan_OLED(f"IP:{ip_sekarang}", f"Suhu: {suhu} C", f"LDR : {nilai_cahaya}")
+                
             except OSError:
-                print("Gagal kirim, cek kabel.")
+                print("Gagal membaca sensor atau kirim MQTT.")
+                Tampilkan_OLED("System Error!", "Check Hardware")
             
             waktu_sebelumnya = waktu_sekarang
 
-# --- 4. TANGKAP TOMBOL STOP DARI LAPTOP ---
 except KeyboardInterrupt:
-    print("\nProgram dihentikan secara paksa oleh pengguna!")
+    print("\nProgram dihentikan.")
+    Tampilkan_OLED("Program Stopped")
 
-# --- 5. FINALLY BERADA DI TINGKAT PALING LUAR ---
 finally:
-    print("Mereset status pin perangkat keras...")
     led.value(0)
     buzzer.value(0)
-    
-    # Ini HANYA akan tereksekusi SATU KALI saat program benar-benar mati.
-
-    
