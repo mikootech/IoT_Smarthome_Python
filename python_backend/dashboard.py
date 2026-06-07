@@ -16,8 +16,8 @@ except ImportError:
     pass # Lanjutkan saja, jangan error
 
 # Ambil kunci dari Brankas (baik lokal maupun cloud)
-url = os.environ.get("SUPABASE_URL") or st.secrets.get("SUPABASE_URL")
-key = os.environ.get("SUPABASE_KEY") or st.secrets.get("SUPABASE_KEY")
+url = os.environ.get("URL") or st.secrets.get("URL")
+key = os.environ.get("KEY") or st.secrets.get("KEY")
 
 if not url or not key:
     st.error("Kredensial Supabase tidak ditemukan!")
