@@ -1,0 +1,5 @@
+broker = "broker.hivemq.com"
+client = "esp32_mikojat_smart_179"
+topik = "miko/home/smart"
+ssid = "POCO M5"
+password = "miko1234"

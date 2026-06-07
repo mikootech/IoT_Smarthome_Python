@@ -13,8 +13,8 @@ TOPIK = os.getenv("TOPIK")
 
 # --- KONFIGURASI SUPABASE ---
 # Ambil variabel dari .env secara aman
-url = os.getenv("SUPABASE_URL")
-key = os.getenv("SUPABASE_KEY")
+url = os.getenv("URL")
+key = os.getenv("KEY")
 
 # Validasi keamanan (Mencegah skrip berjalan jika file .env lupa dibuat)
 if not url or not key:
