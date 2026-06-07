@@ -4,3 +4,6 @@
 # Mengabaikan file sampah/cache bawaan Python agar repo tetap bersih
 __pycache__/
 *.pyc
+
+#file config
+config.py
