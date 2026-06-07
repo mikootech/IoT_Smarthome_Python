@@ -63,7 +63,10 @@ def on_message(client, userdata, msg):
     except Exception as e:
         print(f"❌ Gagal menyimpan ke database: {e}")
 
+
+
 # --- EKSEKUSI UTAMA ---
+
 print("Memulai Skrip Backend & Menghubungkan ke Database...")
 client = mqtt.Client()
 client.on_connect = on_connect
